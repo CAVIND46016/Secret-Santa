@@ -139,8 +139,7 @@ class SendEmail:
                         \nMessage sending failed. Connection not found.")
                 return
             
-            self.smtp_conn.quit()
-            print("Your message has been sent successfully.")    
+            self.smtp_conn.quit()   
             
 def main():    
     """
