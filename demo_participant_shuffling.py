@@ -1,3 +1,4 @@
+# Reference: https://stackoverflow.com/questions/19696542/secret-santa-program
 import random
 
 participants = ['Damien', 'Maxime', 'Guy', 'Christine', 'Clément', 'Gaëlle', 'Denis', 
