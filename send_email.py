@@ -9,7 +9,7 @@ import os.path as op
 import socket
 
 import smtplib
-from validate_email import validate_email
+# from validate_email import validate_email
 
 class SendEmail:
     """

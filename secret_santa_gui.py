@@ -19,6 +19,7 @@ class SecretSantaGUI:
     """
     txt_name = [None] * NO_OF_ENTITIES
     txt_email = [None] * NO_OF_ENTITIES
+    txt_gift = [None] * NO_OF_ENTITIES
     txt_date = None
     txt_budget = None
 
@@ -40,7 +41,7 @@ class SecretSantaGUI:
         panel.grid(column=0, row=0)
         panel.img = img  # You need to keep a reference to the photo.
 
-        lbl_message = Label(self.root_obj, text="Enter the names and email addresses for the gift exchange."
+        lbl_message = Label(self.root_obj, text="Enter the names, email addresses, and gift ideas for the gift exchange."
                                                 "\nThe Secret Santa Generator will handle the rest!",
                             padx=20, pady=10)
         lbl_message.grid(column=0, row=1)
@@ -49,12 +50,16 @@ class SecretSantaGUI:
         lbl_name.grid(column=0, row=2)
         lbl_email = Label(self.root_obj, text="Email")
         lbl_email.grid(column=1, row=2)
+        lbl_email = Label(self.root_obj, text="Gift Idea")
+        lbl_email.grid(column=2, row=2)
 
         for i in range(NO_OF_ENTITIES):
             self.txt_name[i] = Entry(self.root_obj, width=30)
             self.txt_name[i].grid(column=0, row=3 + i, padx=5, pady=5)
             self.txt_email[i] = Entry(self.root_obj, width=30)
             self.txt_email[i].grid(column=1, row=3 + i, padx=5, pady=5)
+            self.txt_gift[i] = Entry(self.root_obj, width=30)
+            self.txt_gift[i].grid(column=2, row=3 + i, padx=5, pady=5)
 
         lbl_date = Label(self.root_obj, text="Date of gift exchange: (mm/dd/yyyy)")
         lbl_date.grid(column=0, row=3 + NO_OF_ENTITIES, padx=20, pady=20)
@@ -95,20 +100,27 @@ class SecretSantaGUI:
             return
 
         email_dict = {}
+        gift_dict = {}
         participants = []
         for i in range(NO_OF_ENTITIES):
             email = self.txt_email[i].get()
             name = self.txt_name[i].get()
-            if name and email:
+            gift = self.txt_name[i].get()
+            if name and email and gift:
                 email_dict[email] = name
                 participants.append(email)
+                gift_dict[email] = gift
             else:
-                if email and not name:
+                if email and gift and not name:
                     messagebox.showerror("Error", f"Name not found for entity no. {i+1}.")
                     return
 
-                if name and not email:
+                if name and gift and not email:
                     messagebox.showerror("Error", f"Email mandatory for entity no. {i+1}.")
+                    return
+                
+                if email and name and not gift:
+                    messagebox.showerror("Error", f"Gift mandatory for entity no. {i+1}.")
                     return
 
         if (len(participants)) < 2:
@@ -127,7 +139,7 @@ class SecretSantaGUI:
                             to_address=[giver], \
                             subject=email_formatter.subject(email_dict[giver]), \
                             body=email_formatter.body(email_dict[giver], \
-                                                      email_dict[receiver]))
+                                                      email_dict[receiver], gift_dict[receiver]))
 
         messagebox.showinfo("Success", "Invitations sent.")
 
@@ -151,13 +163,14 @@ class EmailFormatter:
         """
         return f'{name1}, you have drawn a name for Secret Santa!'
 
-    def body(self, name1, name2):
+    def body(self, name1, name2, gift):
         """
         Body content of the email.
         """
         return f"Hi {name1},\nThe names have been drawn using the Python Secret Santa Generator. " \
                f"Find below your drawn name.\n" \
                f"\n{name2}\n" \
+               f"A gift idea for {name2} is {gift}.\n" \
                f"Date of gift exchange: {self._date}\n" \
                f"Budget: US$ {self.budget}\n" \
                f"\nHave Fun!\n" \
