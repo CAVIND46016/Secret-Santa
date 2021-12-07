@@ -3,6 +3,7 @@ Contains logic of building GUI for
 the Secret Santa Generator application.
 """
 import random
+
 from datetime import datetime
 from tkinter import Tk, Label, Button, Entry, messagebox
 
@@ -35,8 +36,8 @@ class SecretSantaGUI:
         """
         self.root_obj.title("Welcome to Secret Santa")
         self.root_obj.geometry('600x700')
-
-        img = ImageTk.PhotoImage(Image.open('SecretSantaLogo_300px.png'))
+        
+        img = ImageTk.PhotoImage(Image.open('secret_santa.jpeg'))
         panel = Label(self.root_obj, image=img)
         panel.grid(column=0, row=0)
         panel.img = img  # You need to keep a reference to the photo.
