@@ -1,14 +1,33 @@
-# Reference: https://stackoverflow.com/questions/19696542/secret-santa-program
+"""
+Title: Secret Santa Program
+Reference: https://stackoverflow.com/questions/19696542/secret-santa-program
+Author: Benjamin Toueg
+"""
+
 import random
 
-participants = ['Damien', 'Maxime', 'Guy', 'Christine', 'Clément', 'Gaëlle', 'Denis', 
- 'Katia', 'Maelys', 'Josian', 'Lucas', 'Isabelle', 'Pascal', 'Julien']
+participants = [
+    "Damien",
+    "Maxime",
+    "Guy",
+    "Christine",
+    "Clément",
+    "Gaëlle",
+    "Denis",
+    "Katia",
+    "Maelys",
+    "Josian",
+    "Lucas",
+    "Isabelle",
+    "Pascal",
+    "Julien"
+]
 
 random.shuffle(participants)
 
-for i in range(len(participants)):
-    print(participants[i],"buys for",participants[(i+1)%(len(participants))])
-    
+for idx in range(len(participants)):
+    print(participants[idx], "buys for", participants[(idx + 1) % (len(participants))])
+
 """
 OUTPUT:
 Guy buys for Christine
