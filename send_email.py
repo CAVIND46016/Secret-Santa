@@ -1,155 +1,197 @@
 """
-Creates a SMTP connection and sends an email.
+Creates an SMTP connection and sends an email.
 """
+
+import os
+import ast
+import logging
+from email.header import Header
+from email.utils import formataddr
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
 from email import encoders
-import os.path as op
-import socket
 
 import smtplib
+from smtplib import SMTPNotSupportedError, SMTPAuthenticationError, \
+    SMTPServerDisconnected, SMTPSenderRefused, SMTPConnectError
 from validate_email import validate_email
 
-class SendEmail:
-    """
-    Contains the logic for sending an email.
-    """
-    def __init__(self, conn_param, use_TLS=True):
+logger = logging.getLogger(__name__)
+
+DEFAULT_EMAIL_CREDENTIALS = ast.literal_eval(
+    os.environ.get("DEFAULT_EMAIL_CREDENTIALS")
+)
+
+
+class Email:
+
+    def __init__(
+        self,
+        credentials=DEFAULT_EMAIL_CREDENTIALS
+    ):
+        self.credentials = credentials
+        self.smtp_conn = self.connect()
+        self.msg = MIMEMultipart()
+
+    @property
+    def credentials(self):
+        return self._credentials
+
+    @credentials.setter
+    def credentials(self, codes):
+        if not codes:
+            raise ValueError("'Credentials' cannot be empty")
+
+        self._credentials = codes
+
+    def connect(self):
         """
-            conn_param = [host, port, user, password] in that order. <list>
-            use_TLS = Boolean value indicating usage of TLS. <boolean>
+        Establishes an SMTP connection with the email server.
         """
-        if not isinstance(conn_param, list):
-            return "Connection parameters are in invalid format."
-        
-        self.is_ok = True
-        self.default_from_name = conn_param[2]
-        
+
+        con = None
+        use_tls = self.credentials.get("use_tls", True)
         try:
-            if use_TLS:
-                self.smtp_conn = smtplib.SMTP(conn_param[0], conn_param[1])
-                self.smtp_conn.starttls()
-            else:
-                self.smtp_conn = smtplib.SMTP_SSL(conn_param[0], conn_param[1])
-                
-            self.smtp_conn.login(conn_param[2], conn_param[3])
-        except socket.gaierror as err: 
-            # This exception is raised for address-related errors, 
-            # for getaddrinfo() and getnameinfo().
-            print("Error: {}".format(err))
-            self.is_ok = False
-        except smtplib.SMTPNotSupportedError:
-            print("SMTP AUTH extension not supported by server.")
-            self.is_ok = False
-        except smtplib.SMTPAuthenticationError:
-            print("The server didn't accept the username/password combination provided \
-                    OR\naccount does not provide access to less secure apps.")
-            self.is_ok = False
-        except smtplib.SMTPServerDisconnected: 
-            print("Connection closed unexpectedly.")
-            self.is_ok = False
-    
-    @staticmethod       
-    def parse_attachments(msg, attachments):
+            con_method = smtplib.SMTP if use_tls else smtplib.SMTP_SSL
+            con = con_method(
+                self.credentials.get("host"),
+                self.credentials.get("port"),
+            )
+
+            con.login(
+                self.credentials.get("user"),
+                self.credentials.get("password")
+            )
+        except (
+            SMTPNotSupportedError,
+            SMTPAuthenticationError,
+            SMTPServerDisconnected,
+            SMTPConnectError
+        ) as ex:
+            logger.error(f"<%s>: %s", type(ex).__name__, ex, exc_info=True)
+
+        return con
+
+    @staticmethod
+    def parse_attachments(attachments):
         """
-            msg: <class 'email.mime.multipart.MIMEMultipart'>
-            attachments: a list of full file paths of respective attachments. <list>
+        Parse and prepare attachments for the email message.
+
+        :param attachments: List of file paths for attachments.
+        :return: List of MIMEBase attachment parts.
         """
+
+        if not isinstance(attachments, (list, tuple)):
+            raise ValueError("Attachments are provided in an invalid format.")
+
+        parts = []
         for path in attachments:
-            part = MIMEBase('application', "octet-stream")
-            with open(path, 'rb') as file:
+            part = MIMEBase("application", "octet-stream")
+            with open(path, "rb") as file:
                 part.set_payload(file.read())
             encoders.encode_base64(part)
-            part.add_header('Content-Disposition',
-                            'attachment; filename="{}"'.format(op.basename(path)))
-            
-            msg.attach(part)
-    
-    @staticmethod 
-    def check_mail_address(emails):
-        """
-            mail: list of email addresses. <list>
-        """
-        if not isinstance(emails, list):
-            return False
-        
-        for mail in emails:
-            if not validate_email(mail):
-                return False
-            
-        return True
-            
-    def send(self, to_address, from_name=None, cc_address=None, \
-             bcc_address=None, subject='', body='', attachments=None):
-        """
-            to:            'To' email address <list> ==> mandatory parameter
-            ********  Rest are optional parameters  **********
-            from_name:      From name to be displayed. <str> default value is user email address
-            cc:            'cc' email address <list>
-            bcc:           'bcc' email address <list>
-            subject:       Subject matter of email <str>
-            body:          Body of the email. <str>
-            attachments:   a list of full file paths of respective attachments. <list>
-        """
-        
-        if not self.is_ok:
-            print("Message sending failed. Connection not found.")
-        else: 
-            # setup the parameters of the message
-            msg = MIMEMultipart()
-            
-            if not from_name:
-                from_name = self.default_from_name
-            
-            msg['From'] = from_name 
-            
-            if not to_address:
-                print("'to' address not specified.")
-                return
-            
-            if not self.check_mail_address(to_address) or \
-                (cc_address and not self.check_mail_address(cc_address)) or \
-                 (bcc_address and not self.check_mail_address(bcc_address)):
-                print("Email address is not in required format and/or is invalid.")
-                return
-            
-            msg['To'] = ', '.join(to_address)
-            
-            if cc_address:
-                msg['Cc'] = ', '.join(cc_address)
-                
-            if bcc_address:
-                msg['Bcc'] = ', '.join(bcc_address)
-            
-            msg['Subject'] = subject
-            msg.attach(MIMEText(body, 'plain'))
-           
-            if attachments: 
-                if isinstance(attachments, list):
-                    self.parse_attachments(msg, attachments)
-                else:
-                    print("Attachments are provided in invalid format.")
-            
-            # send the message via the server set up earlier.
-            try:
-                self.smtp_conn.send_message(msg)
-            except smtplib.SMTPSenderRefused:
-                print("Your message exceeded allowed message size limits.\
-                        \nMessage sending failed. Connection not found.")
-                return
-            
-            self.smtp_conn.quit()   
-            
-def main():    
-    """
-    Entry-point for the function.
-    """        
-    send_email = SendEmail(['smtp.gmail.com', 587, 'python.testing91@gmail.com', 'sawwassaw'], True)
-    send_email.send(to_address=['cavin46016@gmail.com'], \
-                    subject='Test mail', \
-                    body='This is just for testing purposes only.\n\nRegards,\nCavin Dsouza')
+            part.add_header(
+                "Content-Disposition",
+                f'attachment; filename="{os.path.basename(path)}"'
+            )
+            parts.append(part)
 
-if __name__ == "__main__":
-    main()
-    
+        return parts
+
+    def init_msg(
+        self,
+        subject,
+        body,
+        attachments=None
+    ):
+        """
+        Initialize the email message.
+
+        :param subject: The subject of the email.
+        :param body: The body/content of the email.
+        :param attachments: List of file paths for attachments (optional).
+        :return: None
+        """
+
+        if not attachments:
+            attachments = []
+        self.msg["Subject"] = subject
+        self.msg.attach(MIMEText(body, "plain"))
+
+        attachment_parts = Email.parse_attachments(attachments)
+        for part in attachment_parts:
+            self.msg.attach(part)
+
+    def add_recipients(
+        self,
+        from_name,
+        to_address,
+        cc_address,
+        bcc_address
+    ):
+        """
+        Add recipients to the email message.
+
+        :param from_name: The name of the sender.
+        :param to_address: List of email addresses for the primary recipients.
+        :param cc_address: List of email addresses for the carbon copy recipients.
+        :param bcc_address: List of email addresses for the blind carbon copy recipients.
+        """
+
+        def validate(emails_):
+            return emails_ and isinstance(
+                emails_, (list, tuple)
+            ) and all(validate_email(k) for k in emails_)
+
+        if not validate(to_address) or not validate(cc_address) or not validate(bcc_address):
+            raise ValueError("Email address is not in required format and/or is invalid.")
+
+        self.msg["From"] = formataddr(
+            (str(Header(from_name, "utf-8")),
+             self.credentials.get("user"))) if from_name else self.credentials.get("user")
+
+        self.msg["To"] = ", ".join(to_address) if to_address else None
+        self.msg["Cc"] = ", ".join(cc_address) if cc_address else None
+        self.msg["Bcc"] = ", ".join(bcc_address) if bcc_address else None
+
+    def send(
+        self,
+        to_address=None,
+        from_name=None,
+        cc_address=None,
+        bcc_address=None,
+        subject="",
+        body="",
+        attachments=None
+    ):
+        """
+        Send an email.
+
+        :param to_address: List of email addresses for the primary recipients.
+        :param from_name: The name of the sender.
+        :param cc_address: List of email addresses for the carbon copy recipients.
+        :param bcc_address: List of email addresses for the blind carbon copy recipients.
+        :param subject: The subject of the email.
+        :param body: The body/content of the email.
+        :param attachments: List of file paths for attachments (optional).
+        """
+
+        self.init_msg(
+            subject,
+            body,
+            attachments
+        )
+        self.add_recipients(
+            from_name,
+            to_address,
+            cc_address,
+            bcc_address
+        )
+
+        try:
+            self.smtp_conn.send_message(self.msg)
+        except SMTPSenderRefused as ex:
+            logger.error(f"<%s>: %s", type(ex).__name__, ex, exc_info=True)
+        finally:
+            self.smtp_conn.quit()
